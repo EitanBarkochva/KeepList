@@ -4,7 +4,7 @@ const path = require("path");
 const { createStore } = require("./src/dataStore");
 const { generateSchedule, createNotifications } = require("./src/scheduler");
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.KEEPLIST_PORT || 3000);
 const publicDir = path.join(__dirname, "public");
 const store = createStore(path.join(__dirname, "data", "db.json"));
 
