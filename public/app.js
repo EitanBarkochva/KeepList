@@ -6,6 +6,8 @@ const state = {
   activeView: "dashboard"
 };
 
+const staticMode = location.hostname.endsWith("github.io");
+
 const views = {
   admin: [
     ["dashboard", "דשבורד"],
@@ -516,6 +518,7 @@ async function refresh(view = state.activeView) {
 }
 
 async function api(path, options = {}) {
+  if (staticMode) return localApi(path, options);
   const headers = { "Content-Type": "application/json" };
   if (options.auth !== false && state.token) headers.Authorization = `Bearer ${state.token}`;
   const response = await fetch(path, {
@@ -529,6 +532,392 @@ async function api(path, options = {}) {
   }
   if (response.status === 204) return {};
   return response.json();
+}
+
+async function localApi(path, options = {}) {
+  const db = readLocalDb();
+  const method = options.method || "GET";
+  const body = options.body || {};
+  const currentUser = getLocalCurrentUser(db);
+
+  if (method === "POST" && path === "/api/login") {
+    const user = db.users.find((item) => {
+      if (body.role === "admin") return item.role === "admin" && body.password === db.adminPassword;
+      return item.role === "guard" && item.accessCode === body.accessCode && item.isActive;
+    });
+    if (!user) throw new Error("פרטי הכניסה אינם תקינים");
+    const token = `local_${Date.now()}`;
+    db.session = { token, userId: user.id };
+    writeLocalDb(db);
+    return { token, user: sanitizeLocalUser(user) };
+  }
+
+  if (!currentUser) throw new Error("נדרשת כניסה למערכת");
+  const isAdmin = currentUser.role === "admin";
+
+  if (method === "GET" && path === "/api/bootstrap") {
+    return buildLocalBootstrap(db, currentUser);
+  }
+
+  if (path === "/api/users" && method === "POST") {
+    requireLocalAdmin(isAdmin);
+    const user = normalizeLocalUser(body);
+    user.id = localId("u");
+    db.users.push(user);
+    writeLocalDb(db);
+    return sanitizeLocalUser(user);
+  }
+
+  if (path === "/api/users/import" && method === "POST") {
+    requireLocalAdmin(isAdmin);
+    const result = importLocalGuards(db, body.users || []);
+    writeLocalDb(db);
+    return result;
+  }
+
+  if (path === "/api/settings" && (method === "PUT" || method === "POST")) {
+    requireLocalAdmin(isAdmin);
+    db.settings = {
+      id: "settings_1",
+      periodType: body.periodType || "week",
+      startDate: body.startDate,
+      endDate: body.endDate,
+      dayStartTime: body.dayStartTime || "18:00",
+      dayEndTime: body.dayEndTime || "06:00",
+      shiftHours: Number(body.shiftHours || 4),
+      positionsCount: Number(body.positionsCount || 1)
+    };
+    db.positions = Array.from({ length: db.settings.positionsCount }, (_, index) => (
+      db.positions[index] || { id: `p_${index + 1}`, name: `עמדה ${index + 1}`, isActive: true }
+    ));
+    writeLocalDb(db);
+    return db.settings;
+  }
+
+  if (path === "/api/constraints" && method === "POST") {
+    requireLocalAdmin(isAdmin);
+    const constraint = { id: localId("c"), ...body };
+    db.constraints.push(constraint);
+    writeLocalDb(db);
+    return constraint;
+  }
+
+  if (path.startsWith("/api/constraints/") && method === "DELETE") {
+    requireLocalAdmin(isAdmin);
+    const id = path.split("/").pop();
+    db.constraints = db.constraints.filter((item) => item.id !== id);
+    writeLocalDb(db);
+    return {};
+  }
+
+  if (path === "/api/schedule/generate" && method === "POST") {
+    requireLocalAdmin(isAdmin);
+    const generated = generateLocalSchedule(db);
+    db.shifts = generated.shifts;
+    db.metrics = generated.metrics;
+    db.notifications = createLocalNotifications(db.shifts);
+    db.swaps = [];
+    writeLocalDb(db);
+    return { ...generated, notifications: db.notifications };
+  }
+
+  if (path.startsWith("/api/shifts/") && method === "PUT") {
+    requireLocalAdmin(isAdmin);
+    const id = path.split("/").pop();
+    const shift = db.shifts.find((item) => item.id === id);
+    if (!shift) throw new Error("משמרת לא נמצאה");
+    shift.assignedUserId = body.assignedUserId || null;
+    shift.status = body.status || "published";
+    writeLocalDb(db);
+    return shift;
+  }
+
+  if (path === "/api/swaps" && method === "POST") {
+    const shift = db.shifts.find((item) => item.id === body.shiftId);
+    if (!shift || shift.assignedUserId !== currentUser.id) throw new Error("אפשר לבקש החלפה רק למשמרת שלך");
+    const swap = {
+      id: localId("swap"),
+      shiftId: body.shiftId,
+      requesterId: currentUser.id,
+      targetUserId: null,
+      status: "open",
+      createdAt: new Date().toISOString()
+    };
+    shift.status = "swap_pending";
+    db.swaps.push(swap);
+    writeLocalDb(db);
+    return swap;
+  }
+
+  if (path.match(/^\/api\/swaps\/[^/]+\/accept$/) && method === "POST") {
+    const id = path.split("/")[3];
+    const swap = db.swaps.find((item) => item.id === id);
+    if (!swap) throw new Error("בקשה לא נמצאה");
+    swap.targetUserId = currentUser.id;
+    swap.status = "accepted_by_target";
+    writeLocalDb(db);
+    return swap;
+  }
+
+  if (path.match(/^\/api\/swaps\/[^/]+\/approve$/) && method === "POST") {
+    requireLocalAdmin(isAdmin);
+    const id = path.split("/")[3];
+    const swap = db.swaps.find((item) => item.id === id);
+    if (!swap || swap.status !== "accepted_by_target") throw new Error("אפשר לאשר רק החלפה ששני הצדדים אישרו");
+    const shift = db.shifts.find((item) => item.id === swap.shiftId);
+    shift.assignedUserId = swap.targetUserId;
+    shift.status = "published";
+    swap.status = "approved";
+    writeLocalDb(db);
+    return swap;
+  }
+
+  if (path.match(/^\/api\/swaps\/[^/]+\/reject$/) && method === "POST") {
+    const id = path.split("/")[3];
+    const swap = db.swaps.find((item) => item.id === id);
+    if (!swap) throw new Error("בקשה לא נמצאה");
+    swap.status = "rejected";
+    writeLocalDb(db);
+    return swap;
+  }
+
+  throw new Error("פעולה לא נתמכת בגרסת GitHub Pages");
+}
+
+function readLocalDb() {
+  const raw = localStorage.getItem("keeplist_static_db");
+  if (raw) return JSON.parse(raw);
+  const db = createLocalDefaultDb();
+  writeLocalDb(db);
+  return db;
+}
+
+function writeLocalDb(db) {
+  localStorage.setItem("keeplist_static_db", JSON.stringify(db));
+}
+
+function getLocalCurrentUser(db) {
+  const token = localStorage.getItem("keeplist_token");
+  if (!token || db.session?.token !== token) return null;
+  return db.users.find((user) => user.id === db.session.userId) || null;
+}
+
+function createLocalDefaultDb() {
+  const today = new Date();
+  const startDate = today.toISOString().slice(0, 10);
+  const endDate = new Date(today.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return {
+    adminPassword: "1234",
+    users: [
+      { id: "u_admin", name: "רבש\"צ", phone: "", email: "admin@example.com", role: "admin", accessCode: "ADMIN", isActive: true, targetHours: 0, notes: "" },
+      { id: "u_1", guardNumber: "1", name: "דוד כהן", roleTitle: "שומר", phone: "0501111111", email: "david@example.com", role: "guard", accessCode: "DAVID1", isActive: true, targetHours: 8, notes: "" },
+      { id: "u_2", guardNumber: "2", name: "משה לוי", roleTitle: "שומר", phone: "0502222222", email: "moshe@example.com", role: "guard", accessCode: "MOSHE2", isActive: true, targetHours: 8, notes: "" },
+      { id: "u_3", guardNumber: "3", name: "יוסי ישראלי", roleTitle: "שומר", phone: "0503333333", email: "yossi@example.com", role: "guard", accessCode: "YOSSI3", isActive: true, targetHours: 8, notes: "" }
+    ],
+    settings: {
+      id: "settings_1",
+      periodType: "week",
+      startDate,
+      endDate,
+      dayStartTime: "18:00",
+      dayEndTime: "06:00",
+      shiftHours: 4,
+      positionsCount: 1
+    },
+    constraints: [],
+    positions: [{ id: "p_1", name: "שער ראשי", isActive: true }],
+    shifts: [],
+    swaps: [],
+    notifications: [],
+    metrics: {},
+    session: null
+  };
+}
+
+function buildLocalBootstrap(db, currentUser) {
+  return {
+    currentUser: sanitizeLocalUser(currentUser),
+    users: db.users.map(sanitizeLocalUser),
+    settings: db.settings,
+    constraints: db.constraints,
+    positions: db.positions,
+    shifts: currentUser.role === "admin" ? db.shifts : db.shifts.filter((shift) => shift.assignedUserId === currentUser.id),
+    swaps: currentUser.role === "admin" ? db.swaps : db.swaps.filter((swap) => swap.requesterId === currentUser.id || !swap.targetUserId || swap.targetUserId === currentUser.id),
+    notifications: currentUser.role === "admin" ? db.notifications : [],
+    metrics: db.metrics || {}
+  };
+}
+
+function sanitizeLocalUser(user) {
+  return { ...user };
+}
+
+function requireLocalAdmin(isAdmin) {
+  if (!isAdmin) throw new Error("פעולה לרבש\"צ בלבד");
+}
+
+function normalizeLocalUser(body) {
+  return {
+    guardNumber: String(body.guardNumber || "").trim(),
+    name: String(body.name || "").trim(),
+    roleTitle: String(body.roleTitle || "").trim(),
+    phone: String(body.phone || "").trim(),
+    email: String(body.email || "").trim(),
+    role: "guard",
+    accessCode: body.accessCode || Math.random().toString(36).slice(2, 8).toUpperCase(),
+    isActive: body.isActive !== false,
+    targetHours: Number(body.targetHours || 0),
+    notes: String(body.notes || "").trim()
+  };
+}
+
+function importLocalGuards(db, rows) {
+  const imported = [];
+  const updated = [];
+  const skipped = [];
+  for (const [index, row] of rows.entries()) {
+    const guard = normalizeLocalImportedGuard(row);
+    if (!guard.name) {
+      skipped.push({ row: index + 1, reason: "missing_name" });
+      continue;
+    }
+    const existing = db.users.find((user) => user.role === "guard" && (
+      (guard.guardNumber && user.guardNumber === guard.guardNumber) ||
+      (guard.email && user.email?.toLowerCase() === guard.email.toLowerCase()) ||
+      (guard.phone && compactLocalPhone(user.phone) === compactLocalPhone(guard.phone))
+    ));
+    if (existing) {
+      Object.assign(existing, guard, { accessCode: guard.accessCode || existing.accessCode, isActive: true });
+      updated.push(sanitizeLocalUser(existing));
+    } else {
+      const created = { id: localId("u"), ...guard, accessCode: guard.accessCode || Math.random().toString(36).slice(2, 8).toUpperCase() };
+      db.users.push(created);
+      imported.push(sanitizeLocalUser(created));
+    }
+  }
+  return { imported, updated, skipped, summary: { imported: imported.length, updated: updated.length, skipped: skipped.length } };
+}
+
+function normalizeLocalImportedGuard(row) {
+  const guardNumber = row.guardNumber || row["מספר שומר"] || row["מספר"] || "";
+  return {
+    guardNumber: String(guardNumber).trim(),
+    name: String(row.name || row["שם מלא"] || row["שם"] || "").trim(),
+    roleTitle: String(row.roleTitle || row["תפקיד"] || "").trim(),
+    phone: String(row.phone || row["טלפון"] || row["נייד"] || "").trim(),
+    email: String(row.email || row["אימייל"] || row["מייל"] || "").trim(),
+    role: "guard",
+    accessCode: String(guardNumber).trim() || undefined,
+    isActive: true,
+    targetHours: Number(row.targetHours || row["שעות יעד"] || 0),
+    notes: String(row.notes || row["הערות"] || "").trim()
+  };
+}
+
+function compactLocalPhone(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function generateLocalSchedule(db) {
+  const settings = db.settings;
+  const guards = db.users.filter((user) => user.role === "guard" && user.isActive);
+  const positions = db.positions.filter((position) => position.isActive).slice(0, settings.positionsCount);
+  const shifts = [];
+  const hoursByUser = Object.fromEntries(guards.map((guard) => [guard.id, 0]));
+  let cursor = localAtTime(settings.startDate, settings.dayStartTime);
+  const end = localAtTime(settings.endDate, settings.dayEndTime);
+  if (end <= cursor) end.setDate(end.getDate() + 1);
+
+  while (cursor < end) {
+    const shiftEnd = new Date(cursor.getTime() + settings.shiftHours * 60 * 60 * 1000);
+    const date = cursor.toISOString().slice(0, 10);
+    const startTime = cursor.toTimeString().slice(0, 5);
+    const endTime = shiftEnd.toTimeString().slice(0, 5);
+    for (const position of positions) {
+      const selected = guards
+        .filter((guard) => !localBlocked(guard.id, db.constraints, date, startTime, endTime))
+        .sort((a, b) => (hoursByUser[a.id] || 0) - (hoursByUser[b.id] || 0))[0] || null;
+      if (selected) hoursByUser[selected.id] += settings.shiftHours;
+      shifts.push({
+        id: `shift_${date}_${startTime.replace(":", "")}_${position.id}`,
+        date,
+        startTime,
+        endTime,
+        positionId: position.id,
+        assignedUserId: selected ? selected.id : null,
+        status: selected ? "published" : "draft"
+      });
+    }
+    cursor = shiftEnd;
+  }
+  return { shifts, metrics: buildLocalMetrics(guards, hoursByUser) };
+}
+
+function buildLocalMetrics(guards, hoursByUser) {
+  const values = Object.values(hoursByUser);
+  const average = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  return {
+    averageHours: Number(average.toFixed(2)),
+    maxGap: values.length ? Math.max(...values) - Math.min(...values) : 0,
+    fairness: guards.map((guard) => ({
+      userId: guard.id,
+      name: guard.name,
+      hours: hoursByUser[guard.id] || 0,
+      deltaFromAverage: Number(((hoursByUser[guard.id] || 0) - average).toFixed(2))
+    })),
+    warnings: shiftsWithoutUsersWarning(values)
+  };
+}
+
+function shiftsWithoutUsersWarning(values) {
+  return values.length ? [] : ["לא קיימים שומרים פעילים"];
+}
+
+function localBlocked(userId, constraints, date, startTime, endTime) {
+  return constraints.some((constraint) => {
+    if (constraint.userId !== userId) return false;
+    if (constraint.type === "full_block") return true;
+    if (constraint.date && constraint.date !== date) return false;
+    if (constraint.type === "date_block") return true;
+    if (constraint.type === "time_block") return localOverlaps(startTime, endTime, constraint.startTime, constraint.endTime);
+    return false;
+  });
+}
+
+function localOverlaps(startA, endA, startB, endB) {
+  const aStart = localMinutes(startA);
+  const aEnd = localMinutes(endA);
+  const bStart = localMinutes(startB);
+  const bEnd = localMinutes(endB);
+  return aStart < bEnd && bStart < aEnd;
+}
+
+function createLocalNotifications(shifts) {
+  const notifications = [];
+  for (const shift of shifts) {
+    if (!shift.assignedUserId) continue;
+    const start = localAtTime(shift.date, shift.startTime);
+    notifications.push({ id: `mail_${shift.id}`, shiftId: shift.id, userId: shift.assignedUserId, channel: "email", sendAt: new Date(start.getTime() - 24 * 60 * 60 * 1000).toISOString(), status: "planned" });
+    notifications.push({ id: `sms_${shift.id}`, shiftId: shift.id, userId: shift.assignedUserId, channel: "sms", sendAt: new Date(start.getTime() - 5 * 60 * 60 * 1000).toISOString(), status: "planned" });
+    notifications.push({ id: `whatsapp_${shift.id}`, shiftId: shift.id, userId: shift.assignedUserId, channel: "whatsapp", sendAt: new Date(start.getTime() - 5 * 60 * 60 * 1000).toISOString(), status: "planned" });
+  }
+  return notifications;
+}
+
+function localAtTime(date, time) {
+  const [hours, minutesValue] = time.split(":").map(Number);
+  const value = new Date(`${date}T00:00:00`);
+  value.setHours(hours, minutesValue, 0, 0);
+  return value;
+}
+
+function localMinutes(time) {
+  const [hours, minutesValue] = time.split(":").map(Number);
+  return hours * 60 + minutesValue;
+}
+
+function localId(prefix) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function formData(form) {
