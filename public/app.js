@@ -15,11 +15,13 @@ const views = {
     ["settings", "הגדרות"],
     ["constraints", "אילוצים"],
     ["schedule", "סידור"],
-    ["swaps", "החלפות"]
+    ["swaps", "החלפות"],
+    ["help", "עזרה"]
   ],
   guard: [
     ["guardHome", "המשמרות שלי"],
-    ["swaps", "החלפות"]
+    ["swaps", "החלפות"],
+    ["help", "עזרה"]
   ]
 };
 
@@ -112,6 +114,7 @@ function render() {
   if (state.activeView === "schedule") renderSchedule();
   if (state.activeView === "swaps") renderSwaps();
   if (state.activeView === "guardHome") renderGuardHome();
+  if (state.activeView === "help") renderHelp();
 }
 
 function renderDashboard() {
@@ -305,6 +308,98 @@ function renderSwaps() {
     </article>
   `;
   bindSwapActions();
+}
+
+function renderHelp() {
+  const el = showView("helpView");
+  const isAdmin = state.user.role === "admin";
+  el.innerHTML = `
+    <article class="panel help-hero">
+      <div>
+        <p class="eyebrow">מדריך שימוש</p>
+        <h2>איך עובדים עם KeepList</h2>
+        <p>המערכת עוזרת לבנות רשימת שמירה לפי שומרים, עמדות, שעות, אילוצים והחלפות. מומלץ לעבוד לפי הסדר: שומרים, הגדרות, אילוצים, יצירת סידור, ואז טיפול בהחלפות.</p>
+      </div>
+      <div class="help-note">
+        <strong>פרטי דמו</strong>
+        <span>רבש"צ: 1234</span>
+        <span>שומרים: DAVID1, MOSHE2, YOSSI3</span>
+      </div>
+    </article>
+
+    <article class="panel half">
+      <h2>כניסה למערכת</h2>
+      <ol class="help-list">
+        <li>בחר אם אתה נכנס כרבש"צ או כשומר.</li>
+        <li>רבש"צ נכנס עם סיסמה.</li>
+        <li>שומר נכנס עם קוד אישי שמופיע בטבלת השומרים.</li>
+      </ol>
+    </article>
+
+    <article class="panel half">
+      <h2>מסך שומר</h2>
+      <ol class="help-list">
+        <li>השומר רואה רק את המשמרות שלו.</li>
+        <li>אם זמן המשמרת לא מתאים, הוא לוחץ על בקשת החלפה.</li>
+        <li>שומר אחר יכול לאשר שהוא מוכן להחליף.</li>
+        <li>ההחלפה מתבצעת סופית רק לאחר אישור רבש"צ.</li>
+      </ol>
+    </article>
+
+    ${isAdmin ? renderAdminHelp() : ""}
+
+    <article class="panel">
+      <h2>מה חשוב לדעת</h2>
+      <div class="help-grid">
+        <div class="help-card">
+          <strong>שוויוניות</strong>
+          <span>המערכת משבצת בכל פעם את השומר עם הכי מעט שעות עד כה, תוך התחשבות באילוצים.</span>
+        </div>
+        <div class="help-card">
+          <strong>תזכורות</strong>
+          <span>כרגע נוצרות תזכורות מתוכננות במערכת: מייל 24 שעות לפני, SMS ו-WhatsApp חמש שעות לפני.</span>
+        </div>
+        <div class="help-card">
+          <strong>GitHub Pages</strong>
+          <span>בכתובת הציבורית הנתונים נשמרים בדפדפן המקומי. לגרסה משותפת אמיתית צריך פריסה עם שרת.</span>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderAdminHelp() {
+  return `
+    <article class="panel">
+      <h2>עבודה מומלצת לרבש"צ</h2>
+      <div class="help-steps">
+        <section>
+          <strong>1. שומרים</strong>
+          <p>הוסף שומרים ידנית או ייבא מאקסל. בייבוא אפשר להשתמש בעמודות: מספר שומר, שם מלא, תפקיד, טלפון, אימייל.</p>
+        </section>
+        <section>
+          <strong>2. הגדרות</strong>
+          <p>קבע טווח תאריכים, שעת התחלה, שעת סיום, אורך משמרת ומספר עמדות.</p>
+        </section>
+        <section>
+          <strong>3. אילוצים</strong>
+          <p>הוסף מי לא שומר בכלל, מי לא זמין בתאריך מסוים, או מי לא זמין בטווח שעות.</p>
+        </section>
+        <section>
+          <strong>4. יצירת סידור</strong>
+          <p>לחץ על יצירה אוטומטית. לאחר מכן בדוק משמרות לא משובצות ופער שוויוניות.</p>
+        </section>
+        <section>
+          <strong>5. תיקונים ידניים</strong>
+          <p>אפשר לשנות שומר במשמרת מתוך טבלת הסידור ולשמור.</p>
+        </section>
+        <section>
+          <strong>6. החלפות</strong>
+          <p>עקוב אחרי בקשות החלפה ואשר רק בקשות שבהן נמצא מחליף ושני הצדדים מסכימים.</p>
+        </section>
+      </div>
+    </article>
+  `;
 }
 
 function renderShiftTable(shifts, editable) {
