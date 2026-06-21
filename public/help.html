@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>עזרה | KeepList</title>
+    <link rel="stylesheet" href="styles.css?v=help-page">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">KeepList</p>
+          <h1>עזרה והדרכה</h1>
+        </div>
+        <a class="secondary page-link" href="./">חזרה לאפליקציה</a>
+      </header>
+
+      <section class="view-grid">
+        <article class="panel help-hero">
+          <div>
+            <p class="eyebrow">מדריך שימוש</p>
+            <h2>איך עובדים עם אפליקציית רשימת השמירה</h2>
+            <p>האפליקציה מיועדת לרבש"צ שמנהל שומרים, עמדות, אילוצים והחלפות, ולשומרים שרואים את המשמרות שלהם ומבקשים החלפה כשצריך.</p>
+          </div>
+          <div class="help-note">
+            <strong>פרטי דמו</strong>
+            <span>רבש"צ: 1234</span>
+            <span>שומרים: DAVID1, MOSHE2, YOSSI3</span>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>סדר עבודה מומלץ לרבש"צ</h2>
+          <div class="help-steps">
+            <section>
+              <strong>1. כניסה</strong>
+              <p>בחר רבש"צ במסך הכניסה והכנס את הסיסמה.</p>
+            </section>
+            <section>
+              <strong>2. שומרים</strong>
+              <p>הוסף שומרים ידנית או ייבא מאקסל. העמודות הנתמכות הן: מספר שומר, שם מלא, תפקיד, טלפון, אימייל.</p>
+            </section>
+            <section>
+              <strong>3. הגדרות</strong>
+              <p>בחר טווח תאריכים, שעת התחלה, שעת סיום, אורך משמרת ומספר עמדות.</p>
+            </section>
+            <section>
+              <strong>4. אילוצים</strong>
+              <p>הוסף מי לא שומר בכלל, מי לא זמין בתאריך מסוים, או מי לא זמין בשעות מסוימות.</p>
+            </section>
+            <section>
+              <strong>5. יצירת סידור</strong>
+              <p>לחץ על יצירה אוטומטית. המערכת תחלק את השמירות בצורה שוויונית ככל האפשר לפי שעות.</p>
+            </section>
+            <section>
+              <strong>6. בדיקה ותיקון</strong>
+              <p>בדוק משמרות לא משובצות, פערי שעות, ושנה שומר ידנית אם צריך.</p>
+            </section>
+          </div>
+        </article>
+
+        <article class="panel half">
+          <h2>ייבוא שומרים מאקסל</h2>
+          <ol class="help-list">
+            <li>פתח את מסך שומרים.</li>
+            <li>ייצא מאקסל קובץ CSV/TSV או העתק טבלה ישירות מאקסל.</li>
+            <li>ודא שיש עמודות: מספר שומר, שם מלא, תפקיד, טלפון, אימייל.</li>
+            <li>לחץ על ייבוא שומרים.</li>
+            <li>אם שומר כבר קיים לפי מספר, טלפון או אימייל, המערכת תעדכן אותו.</li>
+          </ol>
+        </article>
+
+        <article class="panel half">
+          <h2>החלפות שמירה</h2>
+          <ol class="help-list">
+            <li>שומר נכנס עם הקוד האישי שלו.</li>
+            <li>במסך המשמרות שלי הוא לוחץ על בקשת החלפה.</li>
+            <li>שומר אחר יכול לאשר שהוא מוכן להחליף.</li>
+            <li>הרבש"צ מאשר סופית את ההחלפה במסך החלפות.</li>
+          </ol>
+        </article>
+
+        <article class="panel">
+          <h2>הערות חשובות</h2>
+          <div class="help-grid">
+            <div class="help-card">
+              <strong>שוויוניות</strong>
+              <span>המערכת בוחרת בכל משמרת את השומר עם הכי מעט שעות עד אותו רגע, אחרי סינון אילוצים.</span>
+            </div>
+            <div class="help-card">
+              <strong>תזכורות</strong>
+              <span>בשלב זה התזכורות נוצרות כמשימות מתוכננות: מייל 24 שעות לפני, SMS ו-WhatsApp חמש שעות לפני.</span>
+            </div>
+            <div class="help-card">
+              <strong>GitHub Pages</strong>
+              <span>בגרסה הציבורית הנתונים נשמרים בדפדפן המקומי. לגרסה משותפת מלאה צריך פריסה עם שרת.</span>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

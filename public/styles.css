@@ -190,6 +190,24 @@ textarea {
   font-weight: 700;
 }
 
+.help-link,
+.page-link {
+  color: var(--primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.help-link:hover,
+.page-link:hover {
+  text-decoration: underline;
+}
+
+.page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
