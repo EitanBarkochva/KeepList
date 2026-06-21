@@ -94,6 +94,17 @@ button {
   gap: 16px;
 }
 
+.login-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.login-form-header strong {
+  font-size: 1.15rem;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -212,7 +223,7 @@ textarea {
 }
 
 .help-button {
-  width: 100%;
+  min-width: 92px;
 }
 
 .topbar {

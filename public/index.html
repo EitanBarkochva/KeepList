@@ -15,6 +15,10 @@
           <p>ניהול שומרים, אילוצים, החלפות ותזכורות ממקום אחד.</p>
         </div>
         <form id="loginForm" class="login-form">
+          <div class="login-form-header">
+            <strong>כניסה למערכת</strong>
+            <a class="secondary help-button" href="help.html">לעזרה</a>
+          </div>
           <div class="segmented" role="tablist">
             <button type="button" class="active" data-login-role="admin">רבש"צ</button>
             <button type="button" data-login-role="guard">שומר</button>
@@ -24,7 +28,6 @@
             <input id="loginSecret" type="password" autocomplete="current-password" value="1234">
           </label>
           <button class="primary" type="submit">כניסה</button>
-          <a class="secondary help-button" href="help.html">לעזרה</a>
           <p class="hint">דוגמה: סיסמת רבש"צ 1234. קוד שומר: DAVID1, MOSHE2 או YOSSI3.</p>
           <p id="loginError" class="error"></p>
         </form>
