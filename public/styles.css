@@ -191,21 +191,28 @@ textarea {
 }
 
 .help-link,
-.page-link {
+.page-link,
+.help-button {
   color: var(--primary);
   font-weight: 800;
   text-decoration: none;
 }
 
 .help-link:hover,
-.page-link:hover {
+.page-link:hover,
+.help-button:hover {
   text-decoration: underline;
 }
 
-.page-link {
+.page-link,
+.help-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.help-button {
+  width: 100%;
 }
 
 .topbar {
