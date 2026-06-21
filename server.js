@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { createStore } = require("./src/dataStore");
+const { importGuards } = require("./src/guardImport");
 const { generateSchedule, createNotifications } = require("./src/scheduler");
 
 const PORT = Number(process.env.KEEPLIST_PORT || 3000);
@@ -132,6 +133,23 @@ async function handleApi(req, res) {
       if (!user) return sendJson(res, 404, { error: "שומר לא נמצא" });
       store.audit(currentUser.id, "update_user", "users", id);
       return sendJson(res, 200, sanitizeUser(user));
+    }
+
+    if (method === "POST" && url.pathname === "/api/users/import") {
+      if (!isAdmin) return sendJson(res, 403, { error: "פעולה לרבש\"צ בלבד" });
+      const body = await readBody(req);
+      if (!Array.isArray(body.users)) return sendJson(res, 400, { error: "נדרש מערך שומרים לייבוא" });
+
+      let result;
+      store.update((draft) => {
+        result = importGuards(draft, body.users, { updateExisting: body.updateExisting !== false });
+      });
+      store.audit(currentUser.id, "import_users", "users", "bulk");
+      return sendJson(res, 200, {
+        ...result,
+        imported: result.imported.map(sanitizeUser),
+        updated: result.updated.map(sanitizeUser)
+      });
     }
 
     if (url.pathname === "/api/settings") {
@@ -286,7 +304,9 @@ function sanitizeUser(user) {
 
 function normalizeUser(body) {
   return {
+    guardNumber: String(body.guardNumber || "").trim(),
     name: String(body.name || "").trim(),
+    roleTitle: String(body.roleTitle || "").trim(),
     phone: String(body.phone || "").trim(),
     email: String(body.email || "").trim(),
     role: body.role === "admin" ? "admin" : "guard",

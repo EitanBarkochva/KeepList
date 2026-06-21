@@ -146,9 +146,26 @@ function renderGuards() {
   const el = showView("guardsView");
   el.innerHTML = `
     <article class="panel">
+      <h2>ייבוא שומרים מאקסל</h2>
+      <div class="import-grid">
+        <div>
+          <label>קובץ CSV/TSV מאקסל<input id="guardImportFile" type="file" accept=".csv,.tsv,.txt"></label>
+          <p class="hint">אפשר גם להעתיק טבלה מאקסל ולהדביק בתיבה. העמודות הנתמכות: מספר שומר, שם מלא, תפקיד, טלפון, אימייל.</p>
+        </div>
+        <label>הדבקה מטבלת אקסל<textarea id="guardImportText" placeholder="מספר שומר	שם מלא	תפקיד	טלפון	אימייל"></textarea></label>
+        <div class="row-actions">
+          <button id="importGuardsBtn" class="primary" type="button">ייבוא שומרים</button>
+          <button id="clearImportBtn" class="secondary" type="button">ניקוי</button>
+          <span id="importResult" class="hint"></span>
+        </div>
+      </div>
+    </article>
+    <article class="panel">
       <h2>הוספת שומר</h2>
       <form id="guardForm" class="form-grid">
+        <label>מספר שומר<input name="guardNumber"></label>
         <label>שם<input name="name" required></label>
+        <label>תפקיד<input name="roleTitle"></label>
         <label>טלפון<input name="phone"></label>
         <label>אימייל<input name="email" type="email"></label>
         <label>מכסת שעות רצויה<input name="targetHours" type="number" min="0" value="8"></label>
@@ -160,8 +177,10 @@ function renderGuards() {
     </article>
     <article class="panel">
       <h2>שומרים</h2>
-      ${table(["שם", "טלפון", "אימייל", "קוד", "שעות יעד", "סטטוס"], guardUsers().map((user) => [
+      ${table(["מספר", "שם", "תפקיד", "טלפון", "אימייל", "קוד", "שעות יעד", "סטטוס"], guardUsers().map((user) => [
+        user.guardNumber || "",
         user.name,
+        user.roleTitle || "",
         user.phone,
         user.email,
         user.accessCode || "",
@@ -171,6 +190,7 @@ function renderGuards() {
     </article>
   `;
   document.getElementById("guardForm").addEventListener("submit", submitGuard);
+  bindGuardImport();
 }
 
 function renderSettings() {
@@ -318,6 +338,95 @@ async function submitGuard(event) {
   body.targetHours = Number(body.targetHours || 0);
   await api("/api/users", { method: "POST", body });
   await refresh("guards");
+}
+
+function bindGuardImport() {
+  const fileInput = document.getElementById("guardImportFile");
+  const textInput = document.getElementById("guardImportText");
+  const result = document.getElementById("importResult");
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    textInput.value = await file.text();
+    result.textContent = `${file.name} נטען ומוכן לייבוא`;
+  });
+
+  document.getElementById("clearImportBtn").addEventListener("click", () => {
+    fileInput.value = "";
+    textInput.value = "";
+    result.textContent = "";
+  });
+
+  document.getElementById("importGuardsBtn").addEventListener("click", async () => {
+    const rows = parseTabularGuards(textInput.value);
+    if (!rows.length) {
+      result.textContent = "לא נמצאו שורות לייבוא";
+      return;
+    }
+    const response = await api("/api/users/import", { method: "POST", body: { users: rows } });
+    result.textContent = `יובאו ${response.summary.imported}, עודכנו ${response.summary.updated}, דולגו ${response.summary.skipped}`;
+    await refresh("guards");
+  });
+}
+
+function parseTabularGuards(rawText) {
+  const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const delimiter = lines[0].includes("\t") ? "\t" : ",";
+  const rows = lines.map((line) => splitDelimitedLine(line, delimiter));
+  const header = rows[0].map(normalizeHeader);
+  const hasHeader = header.some((cell) => ["guardNumber", "name", "roleTitle", "phone", "email"].includes(cell));
+  const defaultHeader = ["guardNumber", "name", "roleTitle", "phone", "email"];
+  const keys = hasHeader ? header : defaultHeader;
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+
+  return dataRows
+    .map((cells) => Object.fromEntries(keys.map((key, index) => [key, cells[index] || ""])))
+    .filter((row) => row.name || row.fullName || row["שם מלא"]);
+}
+
+function splitDelimitedLine(line, delimiter) {
+  if (delimiter === "\t") return line.split("\t").map((cell) => cell.trim());
+  const cells = [];
+  let current = "";
+  let quoted = false;
+  for (const char of line) {
+    if (char === "\"") quoted = !quoted;
+    else if (char === "," && !quoted) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function normalizeHeader(value) {
+  const text = String(value || "").trim().toLowerCase();
+  const map = {
+    "מספר שומר": "guardNumber",
+    "מספר": "guardNumber",
+    "guard number": "guardNumber",
+    "number": "guardNumber",
+    "שם מלא": "name",
+    "שם": "name",
+    "full name": "name",
+    "name": "name",
+    "תפקיד": "roleTitle",
+    "role": "roleTitle",
+    "position": "roleTitle",
+    "טלפון": "phone",
+    "נייד": "phone",
+    "phone": "phone",
+    "אימייל": "email",
+    "מייל": "email",
+    "email": "email",
+    "mail": "email"
+  };
+  return map[text] || text;
 }
 
 async function submitSettings(event) {

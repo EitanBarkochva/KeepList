@@ -262,10 +262,16 @@ textarea {
 }
 
 .stats-grid,
-.form-grid {
+.form-grid,
+.import-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
+}
+
+.import-grid {
+  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.4fr);
+  align-items: start;
 }
 
 .stat {
@@ -384,5 +390,9 @@ tr:last-child td {
 
   .panel {
     padding: 14px;
+  }
+
+  .import-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createDefaultDb } = require("../src/dataStore");
+const { importGuards } = require("../src/guardImport");
 const { generateSchedule, createNotifications } = require("../src/scheduler");
 
 test("generates balanced weekly shifts", () => {
@@ -63,4 +64,32 @@ test("creates email, sms and whatsapp reminders", () => {
 
   assert.equal(notifications.length, 3);
   assert.deepEqual(notifications.map((item) => item.channel).sort(), ["email", "sms", "whatsapp"]);
+});
+
+test("imports guards from spreadsheet rows and updates duplicates", () => {
+  const db = createDefaultDb();
+
+  const result = importGuards(db, [
+    {
+      "מספר שומר": "77",
+      "שם מלא": "אבי כהן",
+      "תפקיד": "כונן",
+      "טלפון": "0507777777",
+      "אימייל": "avi@example.com"
+    },
+    {
+      "מספר שומר": "77",
+      "שם מלא": "אבי כהן מעודכן",
+      "תפקיד": "סייר",
+      "טלפון": "0507777777",
+      "אימייל": "avi@example.com"
+    }
+  ]);
+
+  const importedGuard = db.users.find((user) => user.guardNumber === "77");
+  assert.equal(result.summary.imported, 1);
+  assert.equal(result.summary.updated, 1);
+  assert.equal(importedGuard.name, "אבי כהן מעודכן");
+  assert.equal(importedGuard.roleTitle, "סייר");
+  assert.equal(importedGuard.accessCode, "77");
 });
