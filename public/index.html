@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KeepList | רשימת שמירה</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="loginView" class="login-view">
+        <div class="brand-panel">
+          <p class="eyebrow">KeepList</p>
+          <h1>רשימת שמירה חכמה</h1>
+          <p>ניהול שומרים, אילוצים, החלפות ותזכורות ממקום אחד.</p>
+        </div>
+        <form id="loginForm" class="login-form">
+          <div class="segmented" role="tablist">
+            <button type="button" class="active" data-login-role="admin">רבש"צ</button>
+            <button type="button" data-login-role="guard">שומר</button>
+          </div>
+          <label>
+            <span id="loginLabel">סיסמת רבש"צ</span>
+            <input id="loginSecret" type="password" autocomplete="current-password" value="1234">
+          </label>
+          <button class="primary" type="submit">כניסה</button>
+          <p class="hint">דוגמה: סיסמת רבש"צ 1234. קוד שומר: DAVID1, MOSHE2 או YOSSI3.</p>
+          <p id="loginError" class="error"></p>
+        </form>
+      </section>
+
+      <section id="appView" class="hidden">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">KeepList</p>
+            <h1 id="pageTitle">דשבורד</h1>
+          </div>
+          <div class="user-chip">
+            <span id="currentUserName"></span>
+            <button id="logoutBtn" class="ghost" type="button">יציאה</button>
+          </div>
+        </header>
+
+        <nav id="navTabs" class="nav-tabs"></nav>
+
+        <section id="adminDashboard" class="view-grid"></section>
+        <section id="guardsView" class="view-grid hidden"></section>
+        <section id="settingsView" class="view-grid hidden"></section>
+        <section id="constraintsView" class="view-grid hidden"></section>
+        <section id="scheduleView" class="view-grid hidden"></section>
+        <section id="swapsView" class="view-grid hidden"></section>
+        <section id="guardHomeView" class="view-grid hidden"></section>
+      </section>
+    </main>
+
+    <template id="emptyStateTemplate">
+      <div class="empty-state">
+        <strong>אין נתונים להצגה</strong>
+        <span>אפשר ליצור או לעדכן נתונים מהמסכים המתאימים.</span>
+      </div>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

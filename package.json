@@ -1,0 +1,17 @@
+{
+  "name": "keeplist",
+  "version": "1.0.0",
+  "description": "Responsive guard duty scheduling MVP",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "guard",
+    "schedule",
+    "mvp"
+  ],
+  "author": "",
+  "license": "MIT"
+}
